@@ -15,13 +15,13 @@ import (
 
 type cache struct {
 	mutexCount 		sync.Mutex		//缓存数量计数器互斥锁
-	mp 				*sync.Map
-	cacheTimeout 	time.Duration	//缓存过期时间	为0 则表示不清缓存
-	gcInterval 		time.Duration	//gc间隔时间
+	mp 			*sync.Map
+	cacheTimeout 		time.Duration		//缓存过期时间	为0 则表示不清缓存
+	gcInterval 		time.Duration		//gc间隔时间
 	count 			uint64			//缓存数据当前数据量
 	nMaxCount		uint64			//缓存数据最大数量， 0表示不做限制
 
-	ch				chan struct{}	//用于退出gc 结束缓存使用
+	ch			chan struct{}		//用于退出gc 结束缓存使用
 }
 
 type cacheItem struct {
@@ -45,7 +45,7 @@ func New(cacheTimeout, gcInterval time.Duration, max uint64)*cache{
 		gcInterval:   gcInterval,
 		count:        0,
 		nMaxCount:    max,
-		ch: 		  make(chan struct{}),
+		ch:           make(chan struct{}),
 	}
 
 	c.StartGC()
@@ -59,7 +59,7 @@ func (c *cache)StartGC()  {
 	}
 
 	go func() {
-		t := time.NewTimer(c.gcInterval)
+		t := time.NewTicker(c.gcInterval)
 		defer t.Stop()
 		for{
 			select{
@@ -72,6 +72,7 @@ func (c *cache)StartGC()  {
 	}()
 }
 
+//结束自动清理缓存功能
 func (c *cache)FinishGC()  {
 	close(c.ch)
 }
@@ -150,3 +151,4 @@ func (c* cache)Clear(){
 	c.count = 0
 	c.mutexCount.Unlock()
 }
+
