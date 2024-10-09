@@ -8,7 +8,7 @@ import (
 )
 
 type QpsLimit struct {
-	QpsLimit 		int32
+	QpsLimit 		int32				//上限次数
 	ReqCurent		int32				//当前次数
 	Interval  		time.Duration	//单位间隔时间
 }
@@ -22,6 +22,7 @@ func NewQPS(intval time.Duration, count int32) *QpsLimit {
 
 	go func() {
 		ticker := time.NewTicker(reqLimit.Interval)
+		defer  ticker.Stop()
 		for {
 			<-ticker.C
 			atomic.SwapInt32(&reqLimit.ReqCurent,0)
