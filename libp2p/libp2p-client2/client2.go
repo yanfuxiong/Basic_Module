@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"encoding/pem"
 	"fmt"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/multiformats/go-multiaddr"
 	"io"
@@ -12,7 +14,8 @@ import (
 	"time"
 )
 
-const ProtocolID = "/libp2p/dcutr/text/1.0.0"
+// const ProtocolID = "/libp2p/dcutr/direct/1.0.0"
+const ProtocolID = "/echo/1.0.0"
 
 var g_chWriteTxt = make(chan string)
 
@@ -60,16 +63,77 @@ func handleStream(s network.Stream) {
 	}()
 }
 
+func MarshalPrivateKeyToPEM(key crypto.PrivKey) ([]byte, error) {
+	encoded, err := crypto.MarshalPrivateKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal private key: %v", err)
+	}
+	pemEncoded := pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: encoded,
+	})
+	return pemEncoded, nil
+}
+
+func UnmarshalPrivateKeyFromPEM(pemData []byte) (crypto.PrivKey, error) {
+	block, _ := pem.Decode(pemData)
+	if block == nil || block.Type != "PRIVATE KEY" {
+		return nil, fmt.Errorf("failed to decode PEM block containing private key")
+	}
+	return crypto.UnmarshalPrivateKey(block.Bytes)
+}
+func GenKey() crypto.PrivKey {
+	privKeyFile := ".priv.pem"
+	var priv crypto.PrivKey
+	var err error
+	var content []byte
+	content, err = os.ReadFile(privKeyFile)
+	if err != nil {
+		priv, _, err = crypto.GenerateKeyPair(crypto.RSA, 2048)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		jsonData, err := MarshalPrivateKeyToPEM(priv)
+		err = os.WriteFile(privKeyFile, jsonData, 0644)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return priv
+	}
+
+	priv, err = UnmarshalPrivateKeyFromPEM(content)
+
+	return priv
+}
+
+func writeNodeID(ID string, filename string) {
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	_, err = file.Write([]byte(ID))
+	if err != nil {
+		log.Println(err)
+	}
+}
 func main() {
 	sourceMultiAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", 7889)) //固定端口
 
+	priv := GenKey()
+
 	node, err := libp2p.New(
 		libp2p.ListenAddrs(sourceMultiAddr),
+		libp2p.Identity(priv),
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer node.Close()
+
+	writeNodeID(node.ID().String(), ".ID")
 
 	fmt.Println("Node2 Multiaddress:", node.Addrs())
 
