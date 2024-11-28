@@ -1,30 +1,31 @@
-package (
-	"math/rand"
+package main
+
+import (
 	"fmt"
-	"time"
+	"math/rand"
 )
 
+const (
+	num = 54
+)
 
-
-func XiPai(){
-	Pai := make([]int, 54)
-	for i:=0; i<54; i++ {
-		fmt.Scanln(@Pai[i])
-		// Pai[i] = i
+func XiPai() {
+	Pai := make([]int, num)
+	for i := 0; i < num; i++ {
+		fmt.Scanln(&Pai[i])
 	}
+	fmt.Println(Pai)
 
 	//随机数
-	rand.Seed(time.Now().UnixNano())
-	//rand.Intn(100)
-	for i:=53; i>0; i--{
-		position := rand.Intn(i + 1)
-		Pai[position],Pai[i] = Pai[i], Pai[position]
+	//rand.NewSource(time.Now().UnixNano())
+	for i := num; i > 0; i-- {
+		position := rand.Intn(i)
+		Pai[position], Pai[i-1] = Pai[i-1], Pai[position]
 	}
 
 	fmt.Println(Pai)
-
 }
 
-
-
-
+func main() {
+	XiPai()
+}
