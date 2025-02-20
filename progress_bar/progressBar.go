@@ -48,23 +48,29 @@ func main() {
 	bar := progressbar.DefaultBytes(100, "下载中...")
 	dstFp, _ := os.OpenFile("dst.gz", os.O_CREATE|os.O_WRONLY, 0644)
 	srcFp, _ := os.OpenFile("go1.14.2.src.tar.gz", os.O_CREATE|os.O_WRONLY, 0644)
+	ctx, canecl := context.WithCancel(context.Background())
+	defer canecl()
 	// 使用 io.Copy 复制数据，并监控进度
 	go func() {
 		for {
-			time.Sleep(100 * time.Millisecond)
-			
-			GoUpdateProgressBar(bar.State().CurrentBytes, bar.State().Max) // 调用自定义进度更新函数
-			if bar.State().CurrentBytes >= bar.State().Max {
-				break
+			select{
+				case <-ctx.Done():
+					return
+				case <-time.After(100 * time.Millisecond):
+					GoUpdateProgressBar(bar.State().CurrentBytes, bar.State().Max) // 调用自定义进度更新函数
+					if bar.State().CurrentBytes >= bar.State().Max {
+						return
+					}
 			}
+						
+			
 		}
 	}()
-	_, err := io.Copy(io.MultiWriter(dstFp, bar), srcFp)
+	nWriteLen, err := io.Copy(io.MultiWriter(dstFp, bar), srcFp)
 	if err != nil {
 		fmt.Println("Error copying file:", err)
 		return
 	}
-	io.Copy(io.MultiWriter(dstFp, bar), srcFp)
-	bar.Finish()
-
+	GoUpdateProgressBar(nWriteLen, bar.State().Max) // 调用自定义进度更新函数
+	
 }
