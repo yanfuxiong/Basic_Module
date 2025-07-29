@@ -16,9 +16,9 @@ type LRU struct {
 }
 
 type entry struct {
-	Key       string 	//节点唯一标识，同时作为key存储到lru的cache里
-	Value     []byte 	// 携带数据
-	TimeStamp int64  	//时间戳
+	Key       string //	节点唯一标识，同时作为key存储到lru的cache里
+	Value     []byte // 携带数据
+	TimeStamp int64  //时间戳
 }
 
 func NewCache(maxByte int64) *LRU {
@@ -123,7 +123,9 @@ func main() {
 		n++
 		time.Sleep(1 * time.Second)
 	}
-	cache.Get("key10")
+	if data, ok := cache.Get("key9"); ok {
+		fmt.Printf("key9  data:%s", string(data))
+	}
 	fmt.Println("\n")
 	cache.PrintLength()*/
 }
