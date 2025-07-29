@@ -2,7 +2,9 @@ package main
 
 import (
 	"container/list"
+	"fmt"
 	"sync"
+	"time"
 )
 
 type LRU struct {
@@ -13,9 +15,10 @@ type LRU struct {
 	mutx    sync.RWMutex             //读写锁，保证并发安全
 }
 
-type Entry struct {
-	Key   string //	节点唯一标识，同时作为key存储到lru的cache里
-	Value []byte // 携带数据
+type entry struct {
+	Key       string 	//节点唯一标识，同时作为key存储到lru的cache里
+	Value     []byte 	// 携带数据
+	TimeStamp int64  	//时间戳
 }
 
 func NewCache(maxByte int64) *LRU {
@@ -34,7 +37,7 @@ func (l *LRU) Get(key string) ([]byte, bool) {
 	if ele, exist := l.cache[key]; exist {
 		l.list.MoveToFront(ele)
 
-		if entry, ok := ele.Value.(*Entry); ok {
+		if entry, ok := ele.Value.(*entry); ok {
 			return entry.Value, true
 		}
 	}
@@ -45,15 +48,82 @@ func (l *LRU) Get(key string) ([]byte, bool) {
 func (l *LRU) Set(key string, data []byte) {
 	l.mutx.Lock()
 	defer l.mutx.Unlock()
-	l.curByte += int64(len(data))
-	l.list.PushFront(Entry{Key: key, Value: data})
 
+	if elem, ok := l.cache[key]; ok {
+		l.curByte = l.curByte - int64(len(elem.Value.(*entry).Value))
+		elem.Value.(*entry).Value = data
+		l.curByte += int64(len(data))
+		l.list.MoveToFront(elem)
+		return
+	}
+
+	l.curByte += int64(len(data))
+	l.list.PushFront(&entry{Key: key, Value: data, TimeStamp: time.Now().UnixMilli()})
 	l.cache[key] = l.list.Front()
+
 	if l.curByte > l.maxByte {
 		valBack := l.list.Back()
-		if ent, ok := valBack.Value.(*Entry); ok {
+		if ent, ok := valBack.Value.(*entry); ok {
+			l.curByte = l.curByte - int64(len(ent.Value))
 			delete(l.cache, ent.Key)
+			fomatTime := time.Unix(ent.TimeStamp, 0).Format("2006-01-02 15:04:05")
+			fmt.Printf("eliminate data, key:[%s], timestamp:[%s]\n", ent.Key, fomatTime)
 		}
 		l.list.Remove(valBack)
 	}
+}
+
+func (l *LRU) PrintLength() {
+	l.mutx.RLock()
+	defer l.mutx.RUnlock()
+
+	ele := l.list.Front()
+	for {
+		if ele == nil {
+			break
+		}
+
+		if ent, ok := ele.Value.(*entry); ok {
+			fmt.Printf("Key:[%s] data:[%s]\n", ent.Key, ent.Value)
+		} else {
+			fmt.Printf("get value err!")
+		}
+		ele = ele.Next()
+	}
+	fmt.Printf("curByte:[%d], maxByte:[%d],Element count:[%d]\n", l.curByte, l.maxByte, len(l.cache))
+}
+
+func main() {
+	c := NewCache(100)
+	done := make(chan struct{})
+	for i := 0; i < 10; i++ {
+		go func(id int) {
+			for j := 0; j < 100; j++ {
+				c.Set(fmt.Sprintf("key%d", id), []byte(fmt.Sprintf("data,data,data,data,data,data:%d", id)))
+			}
+			done <- struct{}{}
+		}(i)
+	}
+	for i := 0; i < 10; i++ {
+		<-done
+	}
+	c.PrintLength()
+
+	/*cache := NewCache(100)
+	cache.PrintLength()
+	fmt.Println("\n")
+
+	n := 0
+	for {
+		if n > 10 {
+			break
+		}
+		value := []byte(fmt.Sprintf("data,data,data,data,data,data:%d", n))
+		cache.Set(fmt.Sprintf("key%d", n), value)
+		n++
+		time.Sleep(1 * time.Second)
+	}
+	cache.Get("key10")
+	fmt.Println("\n")
+	cache.PrintLength()*/
 }
